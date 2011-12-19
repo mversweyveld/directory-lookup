@@ -12,12 +12,12 @@ Dependencies: ruby, sqlite3
 2. Insert this code into your .bash_aliases file:
 
     cd_to_alias() {
-      path=`dl find $1`
-      if [ "$?" -eq "0" ]; then
-        cd $path
-      else
-        echo $path
-      fi
+        path=`dl find $1`
+        if [ "$?" -eq "0" ]; then
+            cd $path
+        else
+            echo $path
+        fi
     }
     alias go="cd_to_alias $1"
 
