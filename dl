@@ -1,0 +1,109 @@
+#!/usr/bin/env ruby
+
+require "sqlite3"
+
+class PathList
+  DEFAULT_DATABASE = File.join(File.expand_path(File.dirname(__FILE__)), 'dlpaths.db')
+
+  def self.run(args, current_path)
+    return usage unless [1, 2].include?(args.size)
+    command, shortcut = args
+    case command
+    when 'add'
+      if shortcut.nil?
+        self.new.add(File.basename(current_path), current_path)
+      else
+        self.new.add(shortcut, current_path)
+      end
+    when 'remove'
+      self.new.remove(shortcut)
+    when 'update'
+      self.new.update(shortcut, current_path)
+    when 'list'
+      self.new.list
+    when 'find'
+      self.new.find(shortcut)
+    else
+      usage
+    end
+  end
+
+  def self.usage
+    puts "usage: dirbase <command> [<alias>]"
+    puts
+    puts "Available commands are:"
+    puts "  add     Memorize a new directory alias"
+    puts "  remove  Remove an existing alias"
+    puts "  update  Change directory associated with alias"
+    puts "  list    List all known alias -> path pairs"
+    puts "  find    Find directory corresponding to given alias"
+  end
+
+  def initialize(database_name = DEFAULT_DATABASE)
+    @db = SQLite3::Database.new(database_name)
+    create_schema
+  end
+
+  def add(shortcut, path)
+    begin
+      @db.execute("INSERT INTO paths VALUES (?, ?)", [shortcut, path])
+      puts "added #{shortcut.inspect} => #{path.inspect}"
+    rescue SQLite3::ConstraintException => e
+      old_shortcut, old_path = find(shortcut)
+      puts "alias already exists: #{old_shortcut.inspect} => #{old_path.inspect}"
+      if path != old_path
+        print "update to new path #{path.inspect}? (y/n) "
+        response = $stdin.gets.chomp.strip
+        if ['y', 'yes'].include?(response.downcase)
+          update(shortcut, path)
+        end
+      end
+    end
+  end
+
+  def update(shortcut, path)
+    @db.execute("UPDATE paths SET path = ? WHERE alias = ?", [path, shortcut])
+    puts "updated #{shortcut.inspect} => #{path.inspect}"
+  end
+
+  def remove(shortcut)
+    @db.execute("DELETE FROM paths WHERE alias = ?", shortcut)
+    puts "removed #{shortcut.inspect}"
+  end
+
+  def find(shortcut)
+    rows = @db.execute("SELECT alias, path FROM paths WHERE alias = ?", shortcut)
+    if rows.empty?
+      puts "unknown path alias: #{shortcut.inspect}"
+      exit(false)
+    else
+      puts rows[0][1]
+      exit(true)
+    end
+  end
+
+  def list
+    rows = @db.execute("SELECT alias, path FROM paths ORDER BY alias")
+    results = rows.map { |a, p| [a, p] }
+    padding = results.empty? ? 0 : results.max { |x,y| x[0].size <=> y[0].size }[0].size
+    lines = results.map { |a, p| "%-#{padding}s => %s" % [a, p] }
+    puts lines.join("\n")
+  end
+
+  private
+
+  def create_schema
+    results = @db.execute <<-SQL
+      CREATE TABLE IF NOT EXISTS paths (
+        alias TEXT PRIMARY KEY,
+        path TEXT
+      );
+    SQL
+  end
+
+end
+
+
+if __FILE__ == $0
+  PathList.run ARGV, Dir.pwd
+end
