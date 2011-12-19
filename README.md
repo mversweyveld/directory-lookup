@@ -1,5 +1,5 @@
-DirectoryLookup
-===============
+Directory Lookup
+================
 
 #### A command line tool to store and retrieve long directory paths using short aliases ####
 
