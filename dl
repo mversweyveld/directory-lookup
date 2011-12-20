@@ -37,7 +37,7 @@ class PathList
   end
 
   def self.usage
-    puts "usage: dirbase <command> [<alias>]"
+    puts "usage: dl <command> [<alias>]"
     puts
     puts "Available commands are:"
     puts "  add     Store a new directory alias"
