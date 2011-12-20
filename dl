@@ -1,9 +1,11 @@
 #!/usr/bin/env ruby
 
 require "sqlite3"
+require "yaml"
 
 class PathList
   DEFAULT_DATABASE = File.join(File.expand_path(File.dirname(__FILE__)), 'dlpaths.db')
+  DEFAULT_YAML = 'dirlist.yml'
 
   def self.run(args, current_path)
     return usage unless [1, 2].include?(args.size)
@@ -23,6 +25,12 @@ class PathList
       self.new.list
     when 'find'
       self.new.find(shortcut)
+    when 'export'
+      self.new.export(current_path, shortcut || DEFAULT_YAML)
+    when 'import'
+      self.new.import(current_path, shortcut || DEFAULT_YAML)
+    when 'wipe'
+      self.new.wipe
     else
       usage
     end
@@ -32,11 +40,14 @@ class PathList
     puts "usage: dirbase <command> [<alias>]"
     puts
     puts "Available commands are:"
-    puts "  add     Memorize a new directory alias"
+    puts "  add     Store a new directory alias"
     puts "  remove  Remove an existing alias"
-    puts "  update  Change directory associated with alias"
-    puts "  list    List all known alias -> path pairs"
+    puts "  update  Alter path associated with alias"
+    puts "  list    List all known alias->path pairs"
     puts "  find    Find directory corresponding to given alias"
+    puts "  export  Output yaml file containing all paths"
+    puts "  import  Import paths from a given yaml file"
+    puts "  wipe    Remove all stored alias->path pairs"
   end
 
   def initialize(database_name = DEFAULT_DATABASE)
@@ -71,6 +82,11 @@ class PathList
     puts "removed #{shortcut.inspect}"
   end
 
+  def wipe
+    @db.execute("DELETE FROM paths")
+    puts "removed all stored paths"
+  end
+
   def find(shortcut)
     rows = @db.execute("SELECT alias, path FROM paths WHERE alias = ?", shortcut)
     if rows.empty?
@@ -90,6 +106,27 @@ class PathList
     puts lines.join("\n")
   end
 
+  def export(current_path, filename)
+    rows = @db.execute("SELECT alias, path FROM paths ORDER BY alias")
+    results = rows.map { |a, p| [a, p] }
+    padding = results.empty? ? 0 : results.max { |x,y| x[0].size <=> y[0].size }[0].size
+    lines = results.map { |a, p| "%-#{padding}s: %s\n" % [a, p] }
+    output_file = File.join(current_path, filename)
+    File.open(output_file, "w") do |file|
+      lines.each { |line| file << line}
+    end
+  end
+
+  def import(current_path, filename)
+    input_file = File.join(current_path, filename)
+    if !File.exist?(input_file)
+      puts "import file not found: #{input_file}"
+    else
+      paths = YAML::load_file(input_file)
+      paths.each_pair { |a,p| add_or_update(a, p) }
+    end
+  end
+
   private
 
   def create_schema
@@ -99,6 +136,14 @@ class PathList
         path TEXT
       );
     SQL
+  end
+
+  def add_or_update(shortcut, path)
+    begin
+      @db.execute("INSERT INTO paths VALUES (?, ?)", [shortcut, path])
+    rescue SQLite3::ConstraintException => e
+      @db.execute("UPDATE paths SET path = ? WHERE alias = ?", [path, shortcut]) rescue nil
+    end
   end
 
 end
