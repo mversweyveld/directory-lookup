@@ -26,6 +26,18 @@ Dependencies: ruby, sqlite3
 Usage
 -----
 
+    usage: dirbase <command> [<alias>]
+
+    Available commands are:
+      add     Store a new directory alias
+      remove  Remove an existing alias
+      update  Alter path associated with alias
+      list    List all known alias->path pairs
+      find    Find directory corresponding to given alias
+      export  Output yaml file containing all paths
+      import  Import paths from a given yaml file
+      wipe    Remove all stored alias->path pairs
+
 To assign a shortcut alias to the current directory:
 
     $ dl add short
