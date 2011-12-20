@@ -26,7 +26,7 @@ Dependencies: ruby, sqlite3
 Usage
 -----
 
-    usage: dirbase <command> [<alias>]
+    usage: dl <command> [<alias>]
 
     Available commands are:
       add     Store a new directory alias
