@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require "sqlite3"
+require 'dalli'
 require "yaml"
 
 class PathList
@@ -50,12 +51,14 @@ class PathList
 
   def initialize(database_name)
     @db = SQLite3::Database.new(database_name)
+    @mc = Dalli::Client.new('localhost:11211')
     create_schema
   end
 
   def add(shortcut, path)
     begin
       @db.execute("INSERT INTO paths VALUES (?, ?)", [shortcut, path])
+      @mc.set(shortcut, path)
       puts "added #{shortcut.inspect} => #{path.inspect}"
     rescue SQLite3::ConstraintException => e
       old_shortcut, old_path = find(shortcut)
@@ -72,25 +75,37 @@ class PathList
 
   def update(shortcut, path)
     @db.execute("UPDATE paths SET path = ? WHERE alias = ?", [path, shortcut])
+    @mc.set(shortcut, path)
     puts "updated #{shortcut.inspect} => #{path.inspect}"
   end
 
   def remove(shortcut)
     @db.execute("DELETE FROM paths WHERE alias = ?", shortcut)
+    @mc.delete(shortcut)
     puts "removed #{shortcut.inspect}"
   end
 
   def wipe
     @db.execute("DELETE FROM paths")
+    @mc.flush
     puts "removed all stored paths"
   end
 
   def find(shortcut)
+    # first check the cache
+    path = @mc.get(shortcut)
+    if path
+      puts path
+      exit(true)
+    end
+
+    # if cache lookup failed, attempt db lookup
     rows = @db.execute("SELECT alias, path FROM paths WHERE alias = ?", shortcut)
     if rows.empty?
       puts "unknown path alias: #{shortcut.inspect}"
       exit(false)
     else
+      @mc.set(rows[0][0], rows[0][1])
       puts rows[0][1]
       exit(true)
     end
