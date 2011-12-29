@@ -4,33 +4,31 @@ require "sqlite3"
 require "yaml"
 
 class PathList
-  DEFAULT_DATABASE = File.join(File.expand_path(File.dirname(__FILE__)), 'dlpaths.db')
-  DEFAULT_YAML = 'dirlist.yml'
 
-  def self.run(args, current_path)
+  def self.run(args, current_path, database_name)
     return usage unless [1, 2].include?(args.size)
     command, shortcut = args
     case command
     when 'add'
       if shortcut.nil?
-        self.new.add(File.basename(current_path), current_path)
+        self.new(database_name).add(File.basename(current_path), current_path)
       else
-        self.new.add(shortcut, current_path)
+        self.new(database_name).add(shortcut, current_path)
       end
     when 'remove'
-      self.new.remove(shortcut)
+      self.new(database_name).remove(shortcut)
     when 'update'
-      self.new.update(shortcut, current_path)
+      self.new(database_name).update(shortcut, current_path)
     when 'list'
-      self.new.list
+      self.new(database_name).list
     when 'find'
-      self.new.find(shortcut)
+      self.new(database_name).find(shortcut)
     when 'export'
-      self.new.export(current_path, shortcut || DEFAULT_YAML)
+      self.new(database_name).export(current_path, shortcut)
     when 'import'
-      self.new.import(current_path, shortcut || DEFAULT_YAML)
+      self.new(database_name).import(current_path, shortcut)
     when 'wipe'
-      self.new.wipe
+      self.new(database_name).wipe
     else
       usage
     end
@@ -50,7 +48,7 @@ class PathList
     puts "  wipe    Remove all stored alias->path pairs"
   end
 
-  def initialize(database_name = DEFAULT_DATABASE)
+  def initialize(database_name)
     @db = SQLite3::Database.new(database_name)
     create_schema
   end
@@ -150,5 +148,7 @@ end
 
 
 if __FILE__ == $0
-  PathList.run ARGV, Dir.pwd
+  default_db = File.join(File.expand_path(File.dirname(__FILE__)), 'dlpaths.db')
+  PathList.run ARGV, Dir.pwd, default_db
 end
+
